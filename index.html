@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Combat Tracker</title>
+  <meta name="theme-color" content="#2f6fe0">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <link rel="stylesheet" href="./style.css">
 </head>
+
 <body>
   <header>
     <h1>Combat Tracker</h1>
@@ -23,7 +29,9 @@
 
   <footer>
     <button id="addRow" type="button">Add row</button>
-    <p>Drag on a row to add an action, including under an existing one. Drag a block to move it, its right edge to resize it, or the dot on a line to set its completion time. Drag ≡ to reorder rows. Press Delete to remove the selected event.</p>
+    <p>Drag on a row to add an action, including under an existing one. Drag a block to move it, its right edge to
+      resize it, or the dot on a line to set its completion time. Drag ≡ to reorder rows. Press Delete to remove the
+      selected event.</p>
   </footer>
 
   <aside id="panel" hidden>
@@ -46,4 +54,5 @@
 
   <script src="./app.js"></script>
 </body>
+
 </html>
