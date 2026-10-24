@@ -443,3 +443,8 @@ input:focus-visible {
 .plus:hover {
   background: var(--bg);
 }
+
+button.danger:hover {
+  color: #d92d20;
+  border-color: #d92d20;
+}

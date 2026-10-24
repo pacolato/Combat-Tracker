@@ -417,6 +417,17 @@ $("download").addEventListener("click", () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
+$("reset").addEventListener("click", () => {
+  if (!confirm("Reset everything? This removes all events and all rows except the first, and sets the timeline back to 60 seconds. Download first if you want to keep this combat.")) return;
+  const first = state.rows[0] || newRow("Player 1");
+  first.events = [];
+  state = { rows: [first], length: MIN_SECS };
+  selected = null;
+  save();
+  render();
+  scroller.scrollLeft = 0;
+});
+
 $("upload").addEventListener("click", () => $("file").click());
 
 $("file").addEventListener("change", async () => {
