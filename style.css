@@ -21,9 +21,14 @@
   }
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-html, body { height: 100%; }
+html,
+body {
+  height: 100%;
+}
 
 body {
   margin: 0;
@@ -35,7 +40,8 @@ body {
   color: var(--text);
 }
 
-header, footer {
+header,
+footer {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -43,13 +49,35 @@ header, footer {
   background: var(--surface);
 }
 
-header { border-bottom: 1px solid var(--line-faint); }
-footer { border-top: 1px solid var(--line-faint); }
+header {
+  border-bottom: 1px solid var(--line-faint);
+}
 
-h1 { margin: 0; font-size: 1.1rem; }
-#upto { color: var(--muted); font-variant-numeric: tabular-nums; }
-.actions { margin-left: auto; display: flex; gap: 8px; }
-footer p { margin: 0; font-size: 0.8rem; color: var(--muted); }
+footer {
+  border-top: 1px solid var(--line-faint);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+#upto {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+footer p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
 
 button {
   font: inherit;
@@ -60,13 +88,33 @@ button {
   color: var(--text);
   cursor: pointer;
 }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-#scroller { flex: 1; min-height: 0; overflow: auto; }
-#grid { width: max-content; }
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
 
-.row { display: flex; width: calc(var(--label) + var(--w)); }
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#scroller {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+#grid {
+  width: max-content;
+}
+
+.row {
+  display: flex;
+  width: calc(var(--label) + var(--w) + var(--plus));
+}
 
 .label {
   position: sticky;
@@ -95,9 +143,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border: 1px solid transparent;
   border-radius: 4px;
 }
-.name:hover { border-color: var(--line-faint); }
 
-.icon { padding: 0 6px; border: none; background: transparent; color: var(--muted); font-size: 1.2rem; line-height: 1; }
+.name:hover {
+  border-color: var(--line-faint);
+}
+
+.icon {
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+}
 
 .track {
   position: relative;
@@ -109,13 +167,27 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     linear-gradient(to right, var(--line-faint) 1px, transparent 1px);
   background-size: calc(var(--px) * 3) 100%, var(--px) 100%;
   border-bottom: 1px solid var(--line-faint);
-  touch-action: pan-y; /* horizontal drags draw blocks; scroll sideways using the ruler */
+  touch-action: pan-y;
+  /* horizontal drags draw blocks; scroll sideways using the ruler */
   cursor: crosshair;
 }
 
-.ruler { position: sticky; top: 0; z-index: 3; }
-.ruler .label { z-index: 4; font-size: 0.8rem; }
-.ruler .track { height: 36px; touch-action: auto; cursor: default; }
+.ruler {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.ruler .label {
+  z-index: 4;
+  font-size: 0.8rem;
+}
+
+.ruler .track {
+  height: 36px;
+  touch-action: auto;
+  cursor: default;
+}
 
 .tick {
   position: absolute;
@@ -142,16 +214,33 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   padding: 2px 14px 2px 6px;
   overflow: hidden;
   border-radius: 6px;
-  background: hsl(var(--hue) 62% 44%);
-  color: #fff;
+  background: var(--c);
+  color: var(--fg);
   font-size: 0.75rem;
   line-height: 1.2;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
 }
-.block .text { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.block small { opacity: 0.85; }
+
+.block .head,
+.block .desc {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block .head {
+  padding-right: 16px;
+}
+
+.block .head strong {
+  font-weight: 600;
+}
+
+.block .desc {
+  opacity: 0.85;
+}
 
 .handle {
   position: absolute;
@@ -159,16 +248,47 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   right: 0;
   bottom: 0;
   width: 10px;
-  background: rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, currentColor 30%, transparent);
   cursor: ew-resize;
 }
 
-.block.selected { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); z-index: 1; }
-.block .text.empty { font-style: italic; opacity: 0.8; }
+.block.selected {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text);
+  z-index: 1;
+}
 
-.tail { position: absolute; height: 16px; color: hsl(var(--hue) 62% 44%); cursor: ew-resize; }
-.tail::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: currentColor; }
-.tail::after { content: ""; position: absolute; right: -5px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+.block strong.empty {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.tail {
+  position: absolute;
+  height: 16px;
+  color: var(--c);
+  cursor: ew-resize;
+}
+
+.tail::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 7px;
+  height: 2px;
+  background: currentColor;
+}
+
+.tail::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
 
 #panel {
   position: fixed;
@@ -185,11 +305,34 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
 }
-#panel[hidden] { display: none; }
-.panel-head { display: flex; align-items: flex-start; gap: 8px; }
-#sum { flex: 1; margin: 0; font-size: 0.8rem; color: var(--muted); }
-#panel label { display: flex; flex-direction: column; gap: 2px; font-size: 0.75rem; color: var(--muted); }
-#panel input, #panel textarea {
+
+#panel[hidden] {
+  display: none;
+}
+
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+#sum {
+  flex: 1;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+#panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+#panel input,
+#panel textarea {
   font: inherit;
   padding: 6px;
   color: var(--text);
@@ -197,5 +340,106 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border: 1px solid var(--line-faint);
   border-radius: 4px;
 }
-#panel textarea { resize: vertical; }
-.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+#panel textarea {
+  resize: vertical;
+}
+
+.nums {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.x {
+  position: absolute;
+  top: 2px;
+  right: 12px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+}
+
+.x::before,
+.x::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+
+.x::after {
+  transform: rotate(-45deg);
+}
+
+.x:hover {
+  background: #fff;
+  color: #d92d20;
+}
+
+#panel input[type="color"] {
+  width: 100%;
+  height: 34px;
+  padding: 2px;
+}
+
+#panel input,
+#panel textarea,
+#panel label {
+  min-width: 0;
+  width: 100%;
+}
+
+#panel {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+
+:root {
+  --plus: 44px;
+}
+
+.grip {
+  flex: none;
+  padding: 0 2px;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.row.dragging .label {
+  background: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.plus {
+  flex: none;
+  width: var(--plus);
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--line-faint);
+  border-bottom: 1px solid var(--line-faint);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.plus:hover {
+  background: var(--bg);
+}

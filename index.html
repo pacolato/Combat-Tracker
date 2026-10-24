@@ -23,7 +23,7 @@
 
   <footer>
     <button id="addRow" type="button">Add row</button>
-    <p>Drag on a row to add an action, including under an existing one. Drag a block to move it, its right edge to resize it, or the dot on a line to set its completion time.</p>
+    <p>Drag on a row to add an action, including under an existing one. Drag a block to move it, its right edge to resize it, or the dot on a line to set its completion time. Drag ≡ to reorder rows. Press Delete to remove the selected event.</p>
   </footer>
 
   <aside id="panel" hidden>
@@ -35,9 +35,12 @@
     <label>Description <textarea id="f-desc" rows="3" maxlength="500"></textarea></label>
     <div class="nums">
       <label>Start (s) <input id="f-start" type="number" min="0" step="1"></label>
+      <label>End (s) <input id="f-end" type="number" min="1" step="1"></label>
       <label>Length (s) <input id="f-len" type="number" min="1" step="1"></label>
-      <label>Completion (s) <input id="f-comp" type="number" min="0" step="1"></label>
+      <label>Complete (s) <input id="f-comp" type="number" min="0" step="1"></label>
+      <label>Complete length (s) <input id="f-clen" type="number" min="0" step="1"></label>
     </div>
+    <label>Colour <input id="f-color" type="color"></label>
     <button id="delete" type="button">Delete action</button>
   </aside>
 
