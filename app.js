@@ -1,7 +1,8 @@
 const BASE_PX = 48;     // pixels per second at 100% zoom
-const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2];
+const ZOOMS = [0.5, 0.75, 1, 1.5, 2];
 const GROUP = 3;        // solid line every 3 seconds
 const MIN_SECS = 60;    // timeline is always at least this long
+const MAX_SECS = 3600;  // upper limit for every time value (one hour)
 const LABEL_W = 170;    // width of the name column
 const LANE = 44;        // height of one lane of events
 const BLOCK_H = 36;     // height of an event block inside its lane
@@ -36,8 +37,8 @@ function cleanRows(data) {
       id: uid(),
       name: String(r.name ?? "").slice(0, 60),
       events: (Array.isArray(r.events) ? r.events : []).map((e) => {
-        const start = Math.max(0, Math.floor(Number(e.start)) || 0);
-        const end = Math.max(start + 1, Math.floor(Number(e.end)) || start + 1);
+        const start = Math.min(MAX_SECS - 1, Math.max(0, Math.floor(Number(e.start)) || 0));
+        const end = Math.min(MAX_SECS, Math.max(start + 1, Math.floor(Number(e.end)) || start + 1));
         const winddown = e.winddown !== undefined
           ? Math.floor(Number(e.winddown)) || end
           : e.complete !== undefined
@@ -51,7 +52,7 @@ function cleanRows(data) {
           start,
           end,
           windup,
-          winddown: Math.max(end, winddown),
+          winddown: Math.min(MAX_SECS, Math.max(end, winddown)),
           title: String(e.title ?? e.label ?? "").slice(0, 60), // "label" = older files
           description: String(e.description ?? "").slice(0, 500),
           color: /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : DEFAULT_COLOR,
@@ -65,7 +66,7 @@ function clean(data) {
   const { rows } = cleanRows(data);
   const extent = Math.max(0, ...rows.flatMap((r) => r.events.map((e) => e.winddown)));
   const wanted = Math.max(MIN_SECS, Math.floor(Number(data.length)) || 0, extent);
-  const length = Math.ceil(wanted / GROUP) * GROUP;
+  const length = Math.min(MAX_SECS, Math.ceil(wanted / GROUP) * GROUP);
   return { rows, length, now: Math.min(length, Math.max(0, Math.floor(Number(data.now)) || 0)) };
 }
 
@@ -87,6 +88,12 @@ function loadZoom() {
   } catch { return 1; }
 }
 
+// Emergency reset: opening the page with ?reset clears the saved data on this device.
+if (typeof location !== "undefined" && new URLSearchParams(location.search).has("reset")) {
+  try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(ZOOM_KEY); } catch { /* storage unavailable */ }
+  history.replaceState(null, "", location.pathname);
+}
+
 let state = load() || { rows: [newRow("Player 1"), newRow("Enemy 1")], length: MIN_SECS, now: 0 };
 let zoom = loadZoom();
 let px = BASE_PX * zoom; // pixels per second right now
@@ -99,14 +106,16 @@ let clip = null;         // copied event: { rowId, ev }
 const allEvents = () => state.rows.flatMap((r) => r.events);
 const maxEnd = () => Math.max(0, ...allEvents().map((e) => e.end));
 const maxExtent = () => Math.max(0, ...allEvents().map((e) => e.winddown));
-const totalSecs = () => Math.ceil(Math.max(state.length, maxExtent()) / GROUP) * GROUP;
+const totalSecs = () => Math.min(MAX_SECS, Math.ceil(Math.max(state.length, maxExtent()) / GROUP) * GROUP);
 
-// Keep an event's numbers consistent: windup <= start < end <= winddown.
+// Keep an event's numbers consistent and within limits: windup <= start < end <= winddown <= MAX_SECS.
+const clampSec = (v, lo, hi) => Math.min(hi, Math.max(lo, Number.isFinite(v) ? Math.floor(v) : lo)); // also fixes NaN
+
 function fix(ev) {
-  ev.start = Math.max(0, ev.start);
-  if (ev.end <= ev.start) ev.end = ev.start + 1;
-  ev.windup = Math.min(ev.start, Math.max(0, ev.windup));
-  if (ev.winddown < ev.end) ev.winddown = ev.end;
+  ev.start = clampSec(ev.start, 0, MAX_SECS - 1);
+  ev.end = clampSec(ev.end, ev.start + 1, MAX_SECS);
+  ev.windup = clampSec(ev.windup, 0, ev.start);
+  ev.winddown = clampSec(ev.winddown, ev.end, MAX_SECS);
 }
 
 // Pick black or white text for a given background colour.
@@ -197,7 +206,7 @@ function rulerRow(total, end, now) {
   }
   track.append(h("div", { className: "fill", style: `width:${end * px}px` }));
   track.append(h("div", { className: "now-flag", title: "Drag to move the now marker", style: `left:${now * px}px` }));
-  const plus = h("button", { className: "plus", type: "button", title: `Add ${EXTEND} seconds`, textContent: "+" });
+  const plus = h("button", { className: "plus", type: "button", title: `Add ${EXTEND} seconds`, textContent: "+", disabled: total >= MAX_SECS });
   return h("div", { className: "row ruler" }, h("div", { className: "label" }, "Seconds"), track, plus);
 }
 
@@ -260,6 +269,11 @@ function rowEl(row) {
 }
 
 function render() {
+  // Safety net: whatever got into the data, never draw values outside the limits.
+  state.length = clampSec(state.length, MIN_SECS, MAX_SECS);
+  state.now = clampSec(state.now, 0, MAX_SECS);
+  for (const ev of allEvents()) fix(ev);
+
   const total = totalSecs();
   const now = Math.min(state.now, total);
   grid.style.setProperty("--px", px + "px");
@@ -281,6 +295,8 @@ const F = {
   title: $("f-title"), desc: $("f-desc"), start: $("f-start"),
   end: $("f-end"), len: $("f-len"), wu: $("f-wu"), wulen: $("f-wulen"), wd: $("f-wd"), wdlen: $("f-wdlen"), color: $("f-color"),
 };
+
+for (const el of [F.end, F.len, F.wd, F.wdlen]) el.max = MAX_SECS; // browser arrows and validation respect the limit
 
 function syncPanel(force = false) {
   const found = selected && findEvent(selected);
@@ -322,8 +338,10 @@ function edit(fn, key) {
 // Number fields only apply values that make sense (windup <= start < end <= winddown).
 // Anything else is ignored while typing, and the field snaps back when you leave it.
 function editNum(el, valid, apply) {
+  const maxDigits = String(MAX_SECS).length;
+  if (el.value.length > maxDigits) el.value = el.value.slice(0, maxDigits); // stop absurdly long numbers being typed or pasted
   const v = el.value.trim() === "" ? NaN : Math.floor(Number(el.value));
-  if (!Number.isFinite(v)) return;
+  if (!Number.isFinite(v) || v > MAX_SECS) return; // too big: ignored, and the field snaps back
   edit((ev) => (valid(v, ev) ? apply(v, ev) : false), el.id);
 }
 
@@ -364,7 +382,7 @@ grid.addEventListener("click", (e) => {
   const x = e.target.closest(".x");
   if (x) deleteEvent(x.closest(".block").dataset.ev);
   if (e.target.closest(".plus")) {
-    change(() => { state.length = totalSecs() + EXTEND; });
+    change(() => { state.length = Math.min(MAX_SECS, totalSecs() + EXTEND); });
     scroller.scrollLeft += EXTEND * px; // keep the + under the pointer for repeat taps
   }
 });
@@ -460,7 +478,7 @@ scroller.addEventListener("pointerdown", (e) => {
   const track = e.target.closest(".track[data-row]");
   if (!track) return;
 
-  const sec = secAt(e);
+  const sec = Math.min(secAt(e), MAX_SECS - 1);
   const line = e.target.closest(".tail, .lead");
   const node = e.target.closest(".block") || line;
   let row = state.rows.find((r) => r.id === track.dataset.row);
@@ -492,7 +510,7 @@ scroller.addEventListener("pointermove", (e) => {
   if (rowDrag) { reorderRows(e); return; }
   if (!drag) return;
   const { ev, mode } = drag;
-  const cur = secAt(e);
+  const cur = Math.min(secAt(e), MAX_SECS - 1);
   if (Math.abs(e.clientX - drag.x) > 4 || Math.abs(e.clientY - drag.y) > 4) drag.moved = true;
 
   if (mode === "create") {
@@ -504,14 +522,14 @@ scroller.addEventListener("pointermove", (e) => {
     ev.end = Math.max(ev.start + 1, cur + 1);
     fix(ev);
   } else if (mode === "winddown") {
-    ev.winddown = Math.max(ev.end, Math.round(posAt(e)));
+    ev.winddown = Math.min(MAX_SECS, Math.max(ev.end, Math.round(posAt(e))));
   } else if (mode === "windup") {
     ev.windup = Math.min(ev.start, Math.max(0, Math.round(posAt(e))));
   } else if (drag.moved) {
     const len = ev.end - ev.start;
     const leadLen = ev.start - ev.windup;
     const tailLen = ev.winddown - ev.end;
-    ev.start = Math.max(leadLen, cur - drag.offset); // can't slide so far left that the wind-up passes 0
+    ev.start = Math.max(leadLen, Math.min(cur - drag.offset, MAX_SECS - len - tailLen)); // can't slide so far left that the wind-up passes 0
     ev.end = ev.start + len;
     ev.windup = ev.start - leadLen;
     ev.winddown = ev.end + tailLen;
@@ -624,6 +642,9 @@ render();
 
 // Offline support: the service worker caches the app's files.
 if ("serviceWorker" in navigator) {
+  // When an updated service worker takes over, reload once so you're never left on old code.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) location.reload(); });
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./service-worker.js").catch(() => { /* e.g. opened from a file:// URL */ });
   });

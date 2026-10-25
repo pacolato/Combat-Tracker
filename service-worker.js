@@ -1,5 +1,5 @@
 // Bump this version whenever you add or rename files in FILES below.
-const CACHE = "combat-tracker-v1";
+const CACHE = "combat-tracker-v2";
 
 // Paths are relative so this works from a GitHub Pages subfolder.
 const FILES = [
@@ -14,7 +14,7 @@ const FILES = [
 
 // Install: save the app's files so it can start with no connection.
 self.addEventListener("install", (event) => {
-    event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));
+    event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))));
     self.skipWaiting();
 });
 
@@ -35,7 +35,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
         caches.open(CACHE).then(async (cache) => {
             const cached = await cache.match(event.request, { ignoreSearch: true });
-            const refresh = fetch(event.request)
+            const refresh = fetch(event.request, { cache: "no-cache" })
                 .then((response) => {
                     if (response.ok && new URL(event.request.url).origin === location.origin) {
                         cache.put(event.request, response.clone());
