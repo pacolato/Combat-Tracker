@@ -19,8 +19,9 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 document.documentElement.style.setProperty("--label", LABEL_W + "px");
 
 // ---------- State ----------
-// { rows: [ { id, name, events: [ { id, start, end, complete, title, description, color } ] } ] }
-// The event itself covers start..end. If complete > end, a line runs from end to complete.
+// { rows: [ { id, name, events: [ { id, windup, start, end, winddown, title, description, color } ] } ] }
+// The event itself covers start..end. A wind-up line runs from windup to start (before it),
+// and a wind-down line runs from end to winddown (after it). windup <= start < end <= winddown.
 
 function newRow(name) { return { id: uid(), name, events: [] }; }
 
@@ -33,14 +34,20 @@ function cleanRows(data) {
       events: (Array.isArray(r.events) ? r.events : []).map((e) => {
         const start = Math.max(0, Math.floor(Number(e.start)) || 0);
         const end = Math.max(start + 1, Math.floor(Number(e.end)) || start + 1);
-        const complete = e.complete !== undefined
-          ? Math.floor(Number(e.complete)) || end
-          : end + (Math.max(0, Math.floor(Number(e.completion)) || 0)); // older files stored seconds after end
+        const winddown = e.winddown !== undefined
+          ? Math.floor(Number(e.winddown)) || end
+          : e.complete !== undefined
+            ? Math.floor(Number(e.complete)) || end                        // older files called it "complete"
+            : end + (Math.max(0, Math.floor(Number(e.completion)) || 0));  // the oldest stored seconds after end
+        const windup = e.windup == null || !Number.isFinite(Number(e.windup))
+          ? start
+          : Math.min(start, Math.max(0, Math.floor(Number(e.windup))));
         return {
           id: uid(),
           start,
           end,
-          complete: Math.max(end, complete),
+          windup,
+          winddown: Math.max(end, winddown),
           title: String(e.title ?? e.label ?? "").slice(0, 60), // "label" = older files
           description: String(e.description ?? "").slice(0, 500),
           color: /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : DEFAULT_COLOR,
@@ -52,7 +59,7 @@ function cleanRows(data) {
 
 function clean(data) {
   const { rows } = cleanRows(data);
-  const extent = Math.max(0, ...rows.flatMap((r) => r.events.map((e) => e.complete)));
+  const extent = Math.max(0, ...rows.flatMap((r) => r.events.map((e) => e.winddown)));
   const wanted = Math.max(MIN_SECS, Math.floor(Number(data.length)) || 0, extent);
   return { rows, length: Math.ceil(wanted / GROUP) * GROUP };
 }
@@ -75,14 +82,15 @@ let selected = null; // id of the selected event
 
 const allEvents = () => state.rows.flatMap((r) => r.events);
 const maxEnd = () => Math.max(0, ...allEvents().map((e) => e.end));
-const maxExtent = () => Math.max(0, ...allEvents().map((e) => e.complete));
+const maxExtent = () => Math.max(0, ...allEvents().map((e) => e.winddown));
 const totalSecs = () => Math.ceil(Math.max(state.length, maxExtent()) / GROUP) * GROUP;
 
-// Keep an event's numbers consistent: start < end <= complete.
+// Keep an event's numbers consistent: windup <= start < end <= winddown.
 function fix(ev) {
   ev.start = Math.max(0, ev.start);
   if (ev.end <= ev.start) ev.end = ev.start + 1;
-  if (ev.complete < ev.end) ev.complete = ev.end;
+  ev.windup = Math.min(ev.start, Math.max(0, ev.windup));
+  if (ev.winddown < ev.end) ev.winddown = ev.end;
 }
 
 // Pick black or white text for a given background colour.
@@ -101,13 +109,13 @@ function findEvent(id) {
 
 // Stack overlapping events into lanes (an event's line counts as part of it).
 function layout(row) {
-  const sorted = [...row.events].sort((a, b) => a.start - b.start || a.end - b.end);
+  const sorted = [...row.events].sort((a, b) => a.windup - b.windup || a.winddown - b.winddown);
   const laneEnds = [];
   const lanes = new Map();
   for (const ev of sorted) {
-    let i = laneEnds.findIndex((end) => end <= ev.start);
+    let i = laneEnds.findIndex((end) => end <= ev.windup);
     if (i < 0) i = laneEnds.length;
-    laneEnds[i] = ev.complete;
+    laneEnds[i] = ev.winddown;
     lanes.set(ev, i);
   }
   return { lanes, count: laneEnds.length };
@@ -152,7 +160,15 @@ function blockEl(ev, y) {
 function tailEl(ev, y) {
   return h("div", {
     className: "tail",
-    style: `left:${ev.end * PX}px;width:${(ev.complete - ev.end) * PX}px;top:${y + (BLOCK_H - 16) / 2}px;--c:${ev.color}`,
+    style: `left:${ev.end * PX}px;width:${(ev.winddown - ev.end) * PX}px;top:${y + (BLOCK_H - 16) / 2}px;--c:${ev.color}`,
+    dataset: { ev: ev.id },
+  });
+}
+
+function leadEl(ev, y) {
+  return h("div", {
+    className: "lead",
+    style: `left:${ev.windup * PX}px;width:${(ev.start - ev.windup) * PX}px;top:${y + (BLOCK_H - 16) / 2}px;--c:${ev.color}`,
     dataset: { ev: ev.id },
   });
 }
@@ -177,7 +193,8 @@ function rowEl(row) {
   });
   for (const ev of row.events) {
     const y = PAD_TOP + lanes.get(ev) * LANE;
-    if (ev.complete > ev.end) track.append(tailEl(ev, y));
+    if (ev.windup < ev.start) track.append(leadEl(ev, y));
+    if (ev.winddown > ev.end) track.append(tailEl(ev, y));
     track.append(blockEl(ev, y));
   }
 
@@ -198,7 +215,7 @@ function render() {
 // ---------- Details panel ----------
 const F = {
   title: $("f-title"), desc: $("f-desc"), start: $("f-start"),
-  end: $("f-end"), len: $("f-len"), comp: $("f-comp"), clen: $("f-clen"), color: $("f-color"),
+  end: $("f-end"), len: $("f-len"), wu: $("f-wu"), wulen: $("f-wulen"), wd: $("f-wd"), wdlen: $("f-wdlen"), color: $("f-color"),
 };
 
 function syncPanel(force = false) {
@@ -212,15 +229,20 @@ function syncPanel(force = false) {
   set(F.start, ev.start);
   set(F.end, ev.end);
   set(F.len, ev.end - ev.start);
-  set(F.comp, ev.complete);
-  set(F.clen, ev.complete - ev.end);
+  set(F.wu, ev.windup);
+  set(F.wulen, ev.start - ev.windup);
+  set(F.wd, ev.winddown);
+  set(F.wdlen, ev.winddown - ev.end);
   F.start.max = ev.end - 1;   // the browser's arrows and validation respect these bounds
   F.end.min = ev.start + 1;
-  F.comp.min = ev.end;
+  F.wd.min = ev.end;
+  F.wu.max = ev.start;
+  F.wulen.max = ev.start;
   set(F.color, ev.color);
   $("sum").textContent =
     `Starts at ${ev.start}s, ends at ${ev.end}s (${ev.end - ev.start}s).` +
-    (ev.complete > ev.end ? ` A line continues to ${ev.complete}s.` : "");
+    (ev.windup < ev.start ? ` Wind-up begins at ${ev.windup}s.` : "") +
+    (ev.winddown > ev.end ? ` Wind-down continues to ${ev.winddown}s.` : "");
 }
 
 function edit(fn) {
@@ -232,7 +254,7 @@ function edit(fn) {
   render();
 }
 
-// Number fields only apply values that make sense (start < end <= complete).
+// Number fields only apply values that make sense (windup <= start < end <= winddown).
 // Anything else is ignored while typing, and the field snaps back when you leave it.
 function editNum(el, valid, apply) {
   const v = el.value.trim() === "" ? NaN : Math.floor(Number(el.value));
@@ -244,15 +266,17 @@ F.title.addEventListener("input", () => edit((ev) => { ev.title = F.title.value;
 F.desc.addEventListener("input", () => edit((ev) => { ev.description = F.desc.value; }));
 F.start.addEventListener("input", () => editNum(F.start, (v, ev) => v >= 0 && v < ev.end, (v, ev) => { ev.start = v; }));
 F.end.addEventListener("input", () => editNum(F.end, (v, ev) => v > ev.start, (v, ev) => { ev.end = v; }));
-F.comp.addEventListener("input", () => editNum(F.comp, (v, ev) => v >= ev.end, (v, ev) => { ev.complete = v; }));
-// Durations: changing the event's length keeps its line length, so the line moves with the end.
+F.wu.addEventListener("input", () => editNum(F.wu, (v, ev) => v >= 0 && v <= ev.start, (v, ev) => { ev.windup = v; }));
+F.wulen.addEventListener("input", () => editNum(F.wulen, (v, ev) => v >= 0 && v <= ev.start, (v, ev) => { ev.windup = ev.start - v; }));
+F.wd.addEventListener("input", () => editNum(F.wd, (v, ev) => v >= ev.end, (v, ev) => { ev.winddown = v; }));
+// Durations: changing the event's length keeps its wind-down length, so that line moves with the end.
 F.len.addEventListener("input", () => editNum(F.len, (v) => v >= 1, (v, ev) => {
-  const line = ev.complete - ev.end;
+  const line = ev.winddown - ev.end;
   ev.end = ev.start + v;
-  ev.complete = ev.end + line;
+  ev.winddown = ev.end + line;
 }));
-F.clen.addEventListener("input", () => editNum(F.clen, (v) => v >= 0, (v, ev) => { ev.complete = ev.end + v; }));
-for (const el of [F.start, F.end, F.len, F.comp, F.clen]) {
+F.wdlen.addEventListener("input", () => editNum(F.wdlen, (v) => v >= 0, (v, ev) => { ev.winddown = ev.end + v; }));
+for (const el of [F.start, F.end, F.len, F.wu, F.wulen, F.wd, F.wdlen]) {
   el.addEventListener("focus", () => setTimeout(() => el.select(), 0)); // typing replaces the old value
   el.addEventListener("change", () => syncPanel(true));                 // snap back if the value was rejected
 }
@@ -325,16 +349,16 @@ scroller.addEventListener("pointerdown", (e) => {
   if (!track) return;
 
   const sec = secAt(e);
-  const tail = e.target.closest(".tail");
-  const node = e.target.closest(".block") || tail;
+  const line = e.target.closest(".tail, .lead");
+  const node = e.target.closest(".block") || line;
   let row = state.rows.find((r) => r.id === track.dataset.row);
   let ev, mode;
 
   if (node) {
     ({ row, ev } = findEvent(node.dataset.ev));
-    mode = tail ? "complete" : e.target.closest(".handle") ? "resize" : "move";
+    mode = line ? (line.classList.contains("lead") ? "windup" : "winddown") : e.target.closest(".handle") ? "resize" : "move";
   } else {
-    ev = { id: uid(), start: sec, end: sec + 1, complete: sec + 1, title: "", description: "", color: DEFAULT_COLOR };
+    ev = { id: uid(), start: sec, end: sec + 1, windup: sec, winddown: sec + 1, title: "", description: "", color: DEFAULT_COLOR };
     row.events.push(ev);
     mode = "create";
   }
@@ -357,18 +381,23 @@ scroller.addEventListener("pointermove", (e) => {
   if (mode === "create") {
     ev.start = Math.min(drag.anchor, cur);
     ev.end = Math.max(drag.anchor, cur) + 1;
-    ev.complete = ev.end;
+    ev.windup = ev.start;
+    ev.winddown = ev.end;
   } else if (mode === "resize") {
     ev.end = Math.max(ev.start + 1, cur + 1);
     fix(ev);
-  } else if (mode === "complete") {
-    ev.complete = Math.max(ev.end, Math.round(posAt(e)));
+  } else if (mode === "winddown") {
+    ev.winddown = Math.max(ev.end, Math.round(posAt(e)));
+  } else if (mode === "windup") {
+    ev.windup = Math.min(ev.start, Math.max(0, Math.round(posAt(e))));
   } else if (drag.moved) {
     const len = ev.end - ev.start;
-    const tailLen = ev.complete - ev.end;
-    ev.start = Math.max(0, cur - drag.offset);
+    const leadLen = ev.start - ev.windup;
+    const tailLen = ev.winddown - ev.end;
+    ev.start = Math.max(leadLen, cur - drag.offset); // can't slide so far left that the wind-up passes 0
     ev.end = ev.start + len;
-    ev.complete = ev.end + tailLen;
+    ev.windup = ev.start - leadLen;
+    ev.winddown = ev.end + tailLen;
     const under = document.elementFromPoint(e.clientX, e.clientY)?.closest(".track[data-row]");
     const target = under && state.rows.find((r) => r.id === under.dataset.row);
     if (target && target !== drag.row) {
@@ -404,11 +433,11 @@ $("addRow").addEventListener("click", () => {
 
 $("download").addEventListener("click", () => {
   const data = {
-    version: 4,
+    version: 5,
     length: totalSecs(),
     rows: state.rows.map(({ name, events }) => ({
       name,
-      events: events.map(({ start, end, complete, title, description, color }) => ({ start, end, complete, title, description, color })),
+      events: events.map(({ windup, start, end, winddown, title, description, color }) => ({ windup, start, end, winddown, title, description, color })),
     })),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });

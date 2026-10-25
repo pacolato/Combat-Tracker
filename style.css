@@ -262,14 +262,16 @@ input:focus-visible {
   opacity: 0.8;
 }
 
-.tail {
+.tail,
+.lead {
   position: absolute;
   height: 16px;
   color: var(--c);
   cursor: ew-resize;
 }
 
-.tail::before {
+.tail::before,
+.lead::before {
   content: "";
   position: absolute;
   left: 0;
@@ -279,7 +281,8 @@ input:focus-visible {
   background: currentColor;
 }
 
-.tail::after {
+.tail::after,
+.lead::after {
   content: "";
   position: absolute;
   right: -5px;
@@ -288,6 +291,11 @@ input:focus-visible {
   height: 10px;
   border-radius: 50%;
   background: currentColor;
+}
+
+.lead::after {
+  left: -5px;
+  right: auto;
 }
 
 #panel {
@@ -447,4 +455,8 @@ input:focus-visible {
 button.danger:hover {
   color: #d92d20;
   border-color: #d92d20;
+}
+
+.nums.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
