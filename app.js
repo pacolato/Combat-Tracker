@@ -407,6 +407,18 @@ function pasteEvent() {
   });
 }
 
+// ---------- Info dropdown ----------
+const infoBtn = $("infoBtn");
+const infoPanel = $("infoPanel");
+function setInfo(open) {
+  infoPanel.hidden = !open;
+  infoBtn.setAttribute("aria-expanded", String(open));
+}
+infoBtn.addEventListener("click", () => setInfo(infoPanel.hidden));
+document.addEventListener("pointerdown", (e) => {
+  if (!infoPanel.hidden && !e.target.closest(".info")) setInfo(false); // click elsewhere closes it
+});
+
 // ---------- Keyboard shortcuts ----------
 document.addEventListener("keydown", (e) => {
   const typing = e.target.closest && e.target.closest("input, textarea, select");
@@ -434,6 +446,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
+  if (e.key === "Escape" && !infoPanel.hidden) { setInfo(false); return; }
   if (e.key === "Escape" && selected) { selected = null; render(); return; }
   if ((e.key === "Delete" || e.key === "Backspace") && selected && !typing) {
     e.preventDefault();

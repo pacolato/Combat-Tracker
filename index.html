@@ -15,6 +15,44 @@
 <body>
   <header>
     <h1>Combat Tracker</h1>
+    <div class="info">
+      <button id="infoBtn" type="button" aria-expanded="false" aria-controls="infoPanel" aria-label="How to use"
+        title="How to use">i</button>
+      <div id="infoPanel" hidden>
+        <h2>How to use</h2>
+        <ul>
+          <li>Drag horizontally across a row to add an event, even directly under another one.</li>
+          <li>Drag an event to move it (to another row too), or drag its right edge to resize it.</li>
+          <li>Click an event to edit its title, description, colour and times in the pop-up.</li>
+          <li>Drag the dot at the end of a wind-up or wind-down line to change it.</li>
+          <li>Drag ≡ to reorder rows. Use the + at the end of the ruler to add 15 seconds to the timeline.</li>
+          <li>Drag the red flag on the ruler to move the now marker.</li>
+          <li>Times are capped at 3600 seconds. Your work is saved on this device automatically.</li>
+          <li>Use the buttons at the top right to upload or download a timeline.</li>
+          <li>The Reset button will clear the entire timeline and restore defaults.</li>
+        </ul>
+        <h2>Shortcuts</h2>
+        <dl>
+          <dt><kbd>Delete</kbd></dt>
+          <dd>Delete the selected event</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>Z</kbd></dt>
+          <dd>Undo (add <kbd>Shift</kbd> to redo)</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>C</kbd> / <kbd>V</kbd></dt>
+          <dd>Copy and paste the selected event in place</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>S</kbd></dt>
+          <dd>Download the timeline</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>O</kbd></dt>
+          <dd>Upload a timeline</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>+</kbd> / <kbd>-</kbd></dt>
+          <dd>Zoom in and out (<kbd>Ctrl</kbd> <kbd>0</kbd> resets)</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>←</kbd> / <kbd>→</kbd></dt>
+          <dd>Move the now marker one second</dd>
+          <dt><kbd>Esc</kbd></dt>
+          <dd>Close the pop-up or this panel</dd>
+        </dl>
+        <p class="note">On a Mac, use <kbd>Cmd</kbd> in place of <kbd>Ctrl</kbd>.</p>
+      </div>
+    </div>
     <span id="upto">Up to: 0s</span>
     <div class="actions">
       <div class="zoom" role="group" aria-label="Zoom">
@@ -35,11 +73,6 @@
 
   <footer>
     <button id="addRow" type="button">Add row</button>
-    <p>Drag on a row to add an action, including under an existing one. Drag a block to move it, its right edge to
-      resize it, or the dots on its wind-up and wind-down lines to change them. Drag ≡ to reorder rows. Drag the red
-      flag on the ruler to move the now marker. Shortcuts: Delete removes the selected event, Ctrl+Z undoes, Ctrl+C and
-      Ctrl+V copy and paste an event, Ctrl+S downloads, Ctrl+O uploads, Ctrl and plus or minus zooms the timeline, Ctrl
-      and left or right arrow moves the now marker.</p>
   </footer>
 
   <aside id="panel" hidden>

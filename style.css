@@ -542,3 +542,97 @@ button:disabled {
   border-radius: 0 0 7px 7px;
   background: #e5322d;
 }
+
+.info {
+  position: relative;
+}
+
+#infoPanel {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line-solid);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  font-size: 0.85rem;
+}
+
+#infoPanel[hidden] {
+  display: none;
+}
+
+#infoPanel h2 {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+}
+
+#infoPanel h2:not(:first-child) {
+  margin-top: 14px;
+}
+
+#infoPanel ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#infoPanel dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 0;
+}
+
+#infoPanel dt {
+  white-space: nowrap;
+}
+
+#infoPanel dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+#infoPanel .note {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+
+kbd {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 1px 5px;
+  border: 1px solid var(--line-solid);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+#infoBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: var(--accent);
+  color: var(--accent);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+}
+
+#infoBtn:hover,
+#infoBtn[aria-expanded="true"] {
+  background: var(--accent);
+  color: #fff;
+}
