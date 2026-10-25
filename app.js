@@ -626,7 +626,7 @@ $("download").addEventListener("click", downloadJson);
 $("reset").addEventListener("click", () => {
   if (!confirm("Reset everything? This removes all events and all rows except the first, and sets the timeline back to 60 seconds. You can undo with Ctrl+Z, or download first to keep a copy.")) return;
   change(() => {
-    const first = state.rows[0] || newRow("Player 1");
+    const first = newRow("Entity 1");
     first.events = [];
     state.rows = [first];
     state.length = MIN_SECS;
