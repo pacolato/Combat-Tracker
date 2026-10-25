@@ -401,6 +401,9 @@ document.addEventListener("keydown", (e) => {
     else if (key === "o") { e.preventDefault(); $("file").click(); }
     else if (key === "c" && !typing && selected && !String(window.getSelection())) { e.preventDefault(); copySelected(); }
     else if (key === "v" && !typing && clip) { e.preventDefault(); pasteEvent(); }
+    else if (key === "+" || key === "=") { e.preventDefault(); stepZoom(1); }   // replaces the browser's page zoom
+    else if (key === "-" || key === "_") { e.preventDefault(); stepZoom(-1); }
+    else if (key === "0") { e.preventDefault(); setZoom(1); }
     return;
   }
 
