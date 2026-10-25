@@ -422,6 +422,15 @@ document.addEventListener("keydown", (e) => {
     else if (key === "+" || key === "=") { e.preventDefault(); stepZoom(1); }   // replaces the browser's page zoom
     else if (key === "-" || key === "_") { e.preventDefault(); stepZoom(-1); }
     else if (key === "0") { e.preventDefault(); setZoom(1); }
+    else if ((key === "arrowleft" || key === "arrowright") && !typing) {
+      e.preventDefault();
+      state.now = clampSec(state.now + (key === "arrowright" ? 1 : -1), 0, totalSecs());
+      save();
+      render();
+      const x = state.now * px, view = scroller.clientWidth - LABEL_W; // bring the marker into view if needed
+      if (x < scroller.scrollLeft) scroller.scrollLeft = x - 20;
+      else if (x > scroller.scrollLeft + view) scroller.scrollLeft = x - view + 20;
+    }
     return;
   }
 
