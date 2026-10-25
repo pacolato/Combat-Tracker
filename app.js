@@ -1,5 +1,5 @@
 const BASE_PX = 48;     // pixels per second at 100% zoom
-const ZOOMS = [0.5, 0.75, 1, 1.5, 2];
+const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2];
 const GROUP = 3;        // solid line every 3 seconds
 const MIN_SECS = 60;    // timeline is always at least this long
 const MAX_SECS = 3600;  // upper limit for every time value (one hour)
