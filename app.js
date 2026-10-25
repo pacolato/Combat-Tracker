@@ -624,7 +624,7 @@ function downloadJson() {
 $("download").addEventListener("click", downloadJson);
 
 $("reset").addEventListener("click", () => {
-  if (!confirm("Reset everything? This removes all events and all rows except the first, and sets the timeline back to 60 seconds. You can undo with Ctrl+Z, or download first to keep a copy.")) return;
+  if (!confirm("Reset everything? This removes all events and all rows, and sets the timeline back to 60 seconds. You can undo with Ctrl+Z, or download first to keep a copy.")) return;
   change(() => {
     const first = newRow("Entity 1");
     first.events = [];
