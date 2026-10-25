@@ -23,10 +23,13 @@
         <ul>
           <li>Drag horizontally across a row to add an event, even directly under another one.</li>
           <li>Drag an event to move it (to another row too), or drag its right edge to resize it.</li>
-          <li>Click an event to edit its title, description, colour and times in the pop-up.</li>
+          <li>Click an event to edit its title, description, colour and times in the pop-up. Hover over a number there
+            and scroll
+            to change it.</li>
           <li>Drag the dot at the end of a wind-up or wind-down line to change it.</li>
           <li>Drag ≡ to reorder rows. Use the + at the end of the ruler to add 15 seconds to the timeline.</li>
-          <li>Drag the red flag on the ruler to move the now marker, or type a time into Now at the top. Clicking that
+          <li>Drag the red flag on the ruler to move the now marker, or type a time into <b>Now</b> at the top. Clicking
+            that
             box jumps the view to the marker.</li>
           <li>Times are capped at 3600 seconds. Your work is saved on this device automatically.</li>
           <li>Use the buttons at the top right to upload or download a timeline.</li>
@@ -98,7 +101,18 @@
       <label>Wind-down end (s) <input id="f-wd" type="number" min="1" step="1"></label>
       <label>Wind-down length (s) <input id="f-wdlen" type="number" min="0" step="1"></label>
     </div>
-    <label>Colour <input id="f-color" type="color"></label>
+    <div class="field">
+      <span class="field-label">Colour</span>
+      <div id="swatches" class="swatches" role="radiogroup" aria-label="Colour">
+        <div id="customSwatch" class="swatch custom" title="Custom colour">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+          </svg>
+          <input id="f-color" type="color" aria-label="Pick a custom colour">
+        </div>
+      </div>
+    </div>
     <button id="delete" type="button">Delete action</button>
   </aside>
 

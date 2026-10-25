@@ -13,6 +13,11 @@ const EXTEND = 15;      // seconds added by the + button
 const MAX_UNDO = 100;
 const STORE_KEY = "combat-tracker-v1";
 const ZOOM_KEY = "combat-tracker-zoom";
+// Colour swatches: a row of preset bubbles, then the grey pen swatch that opens the colour picker.
+const PALETTE = [
+  ["Blue", DEFAULT_COLOR], ["Red", "#d93b3b"], ["Orange", "#e8812a"], ["Yellow", "#e5b422"], ["Green", "#2e9d5b"],
+  ["Teal", "#1ba3a3"], ["Purple", "#8450d6"], ["Pink", "#d6489a"]
+];
 
 const $ = (id) => document.getElementById(id);
 const scroller = $("scroller");
@@ -296,6 +301,25 @@ function render() {
   syncPanel();
 }
 
+// ---------- Scroll over a number box to change it ----------
+// Browsers only step a number box on scroll once it's focused. This makes hover-and-scroll work too.
+function wheelToStep(el, sync) {
+  let acc = 0;
+  el.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const delta = (e.deltaY || e.deltaX) * (e.deltaMode === 1 ? 33 : 1); // some browsers report lines, not pixels
+    if (!delta) return;
+    if (Math.sign(delta) !== Math.sign(acc)) acc = 0;
+    acc += delta;
+    if (Math.abs(acc) < 50) return; // trackpads send many tiny events, so wait until they add up to a step
+    const dir = acc < 0 ? 1 : -1;   // scroll up = up, like a normal number box
+    acc = 0;
+    el.value = String((Number(el.value) || 0) + dir);
+    el.dispatchEvent(new Event("input", { bubbles: true })); // runs the same checks as typing
+    sync(); // show the value actually used, so a step past a limit snaps back
+  }, { passive: false });
+}
+
 // ---------- Details panel ----------
 const F = {
   title: $("f-title"), desc: $("f-desc"), start: $("f-start"),
@@ -303,6 +327,16 @@ const F = {
 };
 
 for (const el of [F.end, F.len, F.wd, F.wdlen]) el.max = MAX_SECS; // browser arrows and validation respect the limit
+
+const customSwatch = $("customSwatch");
+const swatchBtns = PALETTE.map(([name, hex]) => {
+  const b = h("button", { type: "button", className: "swatch", title: name, style: `--c:${hex}`, dataset: { color: hex.toLowerCase() } });
+  b.setAttribute("role", "radio");
+  b.setAttribute("aria-label", name);
+  b.addEventListener("click", () => edit((ev) => { ev.color = hex; }));
+  return b;
+});
+$("swatches").prepend(...swatchBtns);
 
 function syncPanel(force = false) {
   const found = selected && findEvent(selected);
@@ -325,6 +359,15 @@ function syncPanel(force = false) {
   F.wu.max = ev.start;
   F.wulen.max = ev.start;
   set(F.color, ev.color);
+  const colour = ev.color.toLowerCase();
+  let isPreset = false;
+  for (const b of swatchBtns) {
+    const on = b.dataset.color === colour;
+    isPreset ||= on;
+    b.classList.toggle("selected", on);
+    b.setAttribute("aria-checked", String(on));
+  }
+  customSwatch.classList.toggle("selected", !isPreset); // a custom colour is in use
   $("sum").textContent =
     `Starts at ${ev.start}s, ends at ${ev.end}s (${ev.end - ev.start}s).` +
     (ev.windup < ev.start ? ` Wind-up begins at ${ev.windup}s.` : "") +
@@ -370,6 +413,7 @@ for (const el of [F.start, F.end, F.len, F.wu, F.wulen, F.wd, F.wdlen]) {
   el.addEventListener("change", () => syncPanel(true));                 // snap back if the value was rejected
 }
 F.color.addEventListener("input", () => edit((ev) => { ev.color = F.color.value; }, "color"));
+for (const el of [F.start, F.end, F.len, F.wu, F.wulen, F.wd, F.wdlen]) wheelToStep(el, () => syncPanel(true));
 
 $("close").addEventListener("click", () => { selected = null; render(); });
 
@@ -446,6 +490,7 @@ nowInput.addEventListener("input", () => {
 nowInput.addEventListener("change", () => { nowInput.value = state.now; sizeNowInput(); }); // show the value actually used
 nowInput.addEventListener("focus", () => { setTimeout(() => nowInput.select(), 0); revealNow(); });
 nowInput.addEventListener("keydown", (e) => { if (e.key === "Enter") nowInput.blur(); });
+wheelToStep(nowInput, () => { nowInput.value = state.now; sizeNowInput(); });
 
 // ---------- Keyboard shortcuts ----------
 document.addEventListener("keydown", (e) => {
