@@ -26,7 +26,8 @@
           <li>Click an event to edit its title, description, colour and times in the pop-up.</li>
           <li>Drag the dot at the end of a wind-up or wind-down line to change it.</li>
           <li>Drag ≡ to reorder rows. Use the + at the end of the ruler to add 15 seconds to the timeline.</li>
-          <li>Drag the red flag on the ruler to move the now marker.</li>
+          <li>Drag the red flag on the ruler to move the now marker, or type a time into Now at the top. Clicking that
+            box jumps the view to the marker.</li>
           <li>Times are capped at 3600 seconds. Your work is saved on this device automatically.</li>
           <li>Use the buttons at the top right to upload or download a timeline.</li>
           <li>The Reset button will clear the entire timeline and restore defaults.</li>
@@ -53,7 +54,11 @@
         <p class="note">On a Mac, use <kbd>Cmd</kbd> in place of <kbd>Ctrl</kbd>.</p>
       </div>
     </div>
-    <span id="upto">Up to: 0s</span>
+    <span id="upto">
+      <label class="now-edit">Now: <input id="nowInput" type="number" min="0" step="1" inputmode="numeric"
+          aria-label="Now marker, in seconds" title="Type a time to move the now marker and jump to it">s</label>
+      <span id="upToText">/ Up to: 0s</span>
+    </span>
     <div class="actions">
       <div class="zoom" role="group" aria-label="Zoom">
         <button id="zoomOut" type="button" title="Zoom out">−</button>

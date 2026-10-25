@@ -17,6 +17,9 @@ const ZOOM_KEY = "combat-tracker-zoom";
 const $ = (id) => document.getElementById(id);
 const scroller = $("scroller");
 const grid = $("grid");
+const nowInput = $("nowInput");
+// Two digits wide by default, growing only when the number gets longer (8px = padding and border).
+const sizeNowInput = () => { nowInput.style.width = `calc(${Math.max(2, String(nowInput.value).length)}ch + 8px)`; };
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 document.documentElement.style.setProperty("--label", LABEL_W + "px");
@@ -278,7 +281,10 @@ function render() {
   const now = Math.min(state.now, total);
   grid.style.setProperty("--px", px + "px");
   grid.style.setProperty("--w", total * px + "px");
-  $("upto").textContent = `Now: ${now}s / Up to: ${maxEnd()}s`;
+  if (document.activeElement !== nowInput) nowInput.value = now; // don't fight the user while they type
+  nowInput.max = total;
+  sizeNowInput();
+  $("upToText").textContent = `/ Up to: ${maxEnd()}s`;
   $("zoomLevel").textContent = Math.round(zoom * 100) + "%";
   $("zoomOut").disabled = zoom <= ZOOMS[0];
   $("zoomIn").disabled = zoom >= ZOOMS[ZOOMS.length - 1];
@@ -418,6 +424,28 @@ infoBtn.addEventListener("click", () => setInfo(infoPanel.hidden));
 document.addEventListener("pointerdown", (e) => {
   if (!infoPanel.hidden && !e.target.closest(".info")) setInfo(false); // click elsewhere closes it
 });
+
+// ---------- Now field (type a time to move the marker) ----------
+// Scroll sideways so the marker is on screen, centred if it wasn't visible.
+function revealNow() {
+  const x = state.now * px, view = scroller.clientWidth - LABEL_W;
+  if (x < scroller.scrollLeft || x > scroller.scrollLeft + view) scroller.scrollLeft = x - view / 2;
+}
+
+nowInput.addEventListener("input", () => {
+  const maxDigits = String(MAX_SECS).length;
+  if (nowInput.value.length > maxDigits) nowInput.value = nowInput.value.slice(0, maxDigits);
+  sizeNowInput();
+  const v = nowInput.value.trim() === "" ? NaN : Number(nowInput.value);
+  if (!Number.isFinite(v)) return;
+  state.now = clampSec(v, 0, totalSecs()); // past the end just means the end
+  save();
+  render();
+  revealNow();
+});
+nowInput.addEventListener("change", () => { nowInput.value = state.now; sizeNowInput(); }); // show the value actually used
+nowInput.addEventListener("focus", () => { setTimeout(() => nowInput.select(), 0); revealNow(); });
+nowInput.addEventListener("keydown", (e) => { if (e.key === "Enter") nowInput.blur(); });
 
 // ---------- Keyboard shortcuts ----------
 document.addEventListener("keydown", (e) => {

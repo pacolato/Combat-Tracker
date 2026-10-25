@@ -636,3 +636,34 @@ kbd {
   background: var(--accent);
   color: #fff;
 }
+
+.now-edit {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.now-edit input {
+  width: calc(2ch + 8px);
+  /* room for two digits; the script widens it for longer numbers */
+  margin: 0 4px 0 2px;
+  padding: 2px 3px;
+  font: inherit;
+  font-weight: 700;
+  text-align: right;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-faint);
+  border-radius: 4px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.now-edit input::-webkit-inner-spin-button,
+.now-edit input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.now-edit input:hover {
+  border-color: var(--line-solid);
+}
