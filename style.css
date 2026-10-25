@@ -460,3 +460,85 @@ button.danger:hover {
 .nums.two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+header {
+  flex-wrap: wrap;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.zoom {
+  display: flex;
+}
+
+.zoom button {
+  min-width: 34px;
+  padding: 6px 8px;
+  border-radius: 0;
+}
+
+.zoom button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.zoom button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.zoom button+button {
+  margin-left: -1px;
+}
+
+.zoom #zoomLevel {
+  min-width: 56px;
+  font-variant-numeric: tabular-nums;
+}
+
+#grid {
+  position: relative;
+}
+
+.now-line {
+  position: absolute;
+  top: 36px;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #e5322d;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.now-flag {
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 36px;
+  margin-left: -12px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.now-flag::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #e5322d;
+}
+
+.now-flag::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 14px;
+  height: 12px;
+  border-radius: 0 0 7px 7px;
+  background: #e5322d;
+}

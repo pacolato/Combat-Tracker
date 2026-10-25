@@ -1,15 +1,17 @@
-const PX = 48;          // pixels per second
+const BASE_PX = 48;     // pixels per second at 100% zoom
+const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2];
 const GROUP = 3;        // solid line every 3 seconds
 const MIN_SECS = 60;    // timeline is always at least this long
-const PAD = 30;         // empty seconds kept after the last action
 const LABEL_W = 170;    // width of the name column
 const LANE = 44;        // height of one lane of events
 const BLOCK_H = 36;     // height of an event block inside its lane
 const PAD_TOP = 8;
 const STRIP = 22;       // empty strip under each row's events, always free for drawing a new event
 const DEFAULT_COLOR = "#2f6fe0";
-const EXTEND = 15;        // seconds added by the + button
+const EXTEND = 15;      // seconds added by the + button
+const MAX_UNDO = 100;
 const STORE_KEY = "combat-tracker-v1";
+const ZOOM_KEY = "combat-tracker-zoom";
 
 const $ = (id) => document.getElementById(id);
 const scroller = $("scroller");
@@ -19,9 +21,11 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 document.documentElement.style.setProperty("--label", LABEL_W + "px");
 
 // ---------- State ----------
-// { rows: [ { id, name, events: [ { id, windup, start, end, winddown, title, description, color } ] } ] }
+// { rows: [ { id, name, events: [ { id, windup, start, end, winddown, title, description, color } ] } ],
+//   length, now }
 // The event itself covers start..end. A wind-up line runs from windup to start (before it),
 // and a wind-down line runs from end to winddown (after it). windup <= start < end <= winddown.
+// "now" is the second the combat is up to (the red marker).
 
 function newRow(name) { return { id: uid(), name, events: [] }; }
 
@@ -61,7 +65,8 @@ function clean(data) {
   const { rows } = cleanRows(data);
   const extent = Math.max(0, ...rows.flatMap((r) => r.events.map((e) => e.winddown)));
   const wanted = Math.max(MIN_SECS, Math.floor(Number(data.length)) || 0, extent);
-  return { rows, length: Math.ceil(wanted / GROUP) * GROUP };
+  const length = Math.ceil(wanted / GROUP) * GROUP;
+  return { rows, length, now: Math.min(length, Math.max(0, Math.floor(Number(data.now)) || 0)) };
 }
 
 function load() {
@@ -75,10 +80,21 @@ function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
 }
 
-let state = load() || { rows: [newRow("Player 1"), newRow("Enemy 1")], length: MIN_SECS };
+function loadZoom() {
+  try {
+    const z = Number(localStorage.getItem(ZOOM_KEY));
+    return ZOOMS.includes(z) ? z : 1;
+  } catch { return 1; }
+}
+
+let state = load() || { rows: [newRow("Player 1"), newRow("Enemy 1")], length: MIN_SECS, now: 0 };
+let zoom = loadZoom();
+let px = BASE_PX * zoom; // pixels per second right now
 let drag = null;
-let rowDrag = null; // set while a row is being dragged to a new position
-let selected = null; // id of the selected event
+let rowDrag = null;      // set while a row is being dragged to a new position
+let nowDrag = false;     // true while the red marker is being dragged
+let selected = null;     // id of the selected event
+let clip = null;         // copied event: { rowId, ev }
 
 const allEvents = () => state.rows.flatMap((r) => r.events);
 const maxEnd = () => Math.max(0, ...allEvents().map((e) => e.end));
@@ -107,7 +123,7 @@ function findEvent(id) {
   }
 }
 
-// Stack overlapping events into lanes (an event's line counts as part of it).
+// Stack overlapping events into lanes (an event's lines count as part of it).
 function layout(row) {
   const sorted = [...row.events].sort((a, b) => a.windup - b.windup || a.winddown - b.winddown);
   const laneEnds = [];
@@ -121,6 +137,47 @@ function layout(row) {
   return { lanes, count: laneEnds.length };
 }
 
+// ---------- Undo / redo ----------
+// Snapshots cover the rows and timeline length (not the marker or zoom).
+const snapshot = () => JSON.stringify({ rows: state.rows, length: state.length });
+const undoStack = [];
+const redoStack = [];
+let editGroup = null; // consecutive edits to the same field share one undo step
+
+function pushUndo(before) {
+  undoStack.push(before);
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack.length = 0;
+}
+
+// Run a change to the data. Records an undo step, saves and redraws.
+function change(fn, key = null, redraw = true) {
+  const before = snapshot();
+  if (fn() === false) return false;
+  if (snapshot() === before) return false;
+  if (!key || key !== editGroup) pushUndo(before);
+  editGroup = key;
+  save();
+  if (redraw) render();
+  return true;
+}
+
+function stepHistory(from, to) {
+  if (drag || rowDrag || nowDrag || !from.length) return;
+  to.push(snapshot());
+  const s = JSON.parse(from.pop());
+  state.rows = s.rows;
+  state.length = s.length;
+  editGroup = null;
+  save();
+  render();
+  syncPanel(true);
+}
+const undo = () => stepHistory(undoStack, redoStack);
+const redo = () => stepHistory(redoStack, undoStack);
+
+document.addEventListener("focusin", () => { editGroup = null; });
+
 // ---------- Rendering ----------
 function h(tag, props = {}, ...kids) {
   const el = document.createElement(tag);
@@ -133,12 +190,13 @@ function h(tag, props = {}, ...kids) {
   return el;
 }
 
-function rulerRow(total, end) {
+function rulerRow(total, end, now) {
   const track = h("div", { className: "track" });
   for (let s = 0; s <= total; s += GROUP) {
-    track.append(h("span", { className: "tick", style: `left:${s * PX}px` }, String(s)));
+    track.append(h("span", { className: "tick", style: `left:${s * px}px` }, String(s)));
   }
-  track.append(h("div", { className: "fill", style: `width:${end * PX}px` }));
+  track.append(h("div", { className: "fill", style: `width:${end * px}px` }));
+  track.append(h("div", { className: "now-flag", title: "Drag to move the now marker", style: `left:${now * px}px` }));
   const plus = h("button", { className: "plus", type: "button", title: `Add ${EXTEND} seconds`, textContent: "+" });
   return h("div", { className: "row ruler" }, h("div", { className: "label" }, "Seconds"), track, plus);
 }
@@ -147,7 +205,7 @@ function blockEl(ev, y) {
   return h("div",
     {
       className: "block" + (ev.id === selected ? " selected" : ""),
-      style: `left:${ev.start * PX}px;width:${(ev.end - ev.start) * PX}px;top:${y}px;height:${BLOCK_H}px;--c:${ev.color};--fg:${textOn(ev.color)}`,
+      style: `left:${ev.start * px}px;width:${(ev.end - ev.start) * px}px;top:${y}px;height:${BLOCK_H}px;--c:${ev.color};--fg:${textOn(ev.color)}`,
       dataset: { ev: ev.id },
     },
     h("div", { className: "head" }, h("strong", { className: ev.title ? "" : "empty" }, ev.title || "Untitled"), ` - ${ev.end - ev.start}s`),
@@ -160,7 +218,7 @@ function blockEl(ev, y) {
 function tailEl(ev, y) {
   return h("div", {
     className: "tail",
-    style: `left:${ev.end * PX}px;width:${(ev.winddown - ev.end) * PX}px;top:${y + (BLOCK_H - 16) / 2}px;--c:${ev.color}`,
+    style: `left:${ev.end * px}px;width:${(ev.winddown - ev.end) * px}px;top:${y + (BLOCK_H - 16) / 2}px;--c:${ev.color}`,
     dataset: { ev: ev.id },
   });
 }
@@ -168,21 +226,19 @@ function tailEl(ev, y) {
 function leadEl(ev, y) {
   return h("div", {
     className: "lead",
-    style: `left:${ev.windup * PX}px;width:${(ev.start - ev.windup) * PX}px;top:${y + (BLOCK_H - 16) / 2}px;--c:${ev.color}`,
+    style: `left:${ev.windup * px}px;width:${(ev.start - ev.windup) * px}px;top:${y + (BLOCK_H - 16) / 2}px;--c:${ev.color}`,
     dataset: { ev: ev.id },
   });
 }
 
 function rowEl(row) {
   const name = h("input", { className: "name", value: row.name, maxLength: 60, placeholder: "Name" });
-  name.addEventListener("input", () => { row.name = name.value; save(); });
+  name.addEventListener("input", () => change(() => { row.name = name.value; }, "name:" + row.id, false));
 
   const del = h("button", { className: "icon", type: "button", title: "Remove row", textContent: "×" });
   del.addEventListener("click", () => {
     if (row.events.length && !confirm(`Remove "${row.name}" and its ${row.events.length} event(s)?`)) return;
-    state.rows = state.rows.filter((r) => r !== row);
-    save();
-    render();
+    change(() => { state.rows = state.rows.filter((r) => r !== row); });
   });
 
   const { lanes, count } = layout(row);
@@ -205,10 +261,18 @@ function rowEl(row) {
 
 function render() {
   const total = totalSecs();
-  grid.style.setProperty("--px", PX + "px");
-  grid.style.setProperty("--w", total * PX + "px");
-  $("upto").textContent = `Up to: ${maxEnd()}s`;
-  grid.replaceChildren(rulerRow(total, maxEnd()), ...state.rows.map(rowEl));
+  const now = Math.min(state.now, total);
+  grid.style.setProperty("--px", px + "px");
+  grid.style.setProperty("--w", total * px + "px");
+  $("upto").textContent = `Now: ${now}s / Up to: ${maxEnd()}s`;
+  $("zoomLevel").textContent = Math.round(zoom * 100) + "%";
+  $("zoomOut").disabled = zoom <= ZOOMS[0];
+  $("zoomIn").disabled = zoom >= ZOOMS[ZOOMS.length - 1];
+  grid.replaceChildren(
+    rulerRow(total, maxEnd(), now),
+    ...state.rows.map(rowEl),
+    h("div", { className: "now-line", style: `left:${LABEL_W + now * px}px` })
+  );
   syncPanel();
 }
 
@@ -245,13 +309,14 @@ function syncPanel(force = false) {
     (ev.winddown > ev.end ? ` Wind-down continues to ${ev.winddown}s.` : "");
 }
 
-function edit(fn) {
+// Edit the selected event. `key` groups consecutive edits to one field into one undo step.
+function edit(fn, key) {
   const found = selected && findEvent(selected);
   if (!found) return;
-  if (fn(found.ev) === false) return;
-  fix(found.ev);
-  save();
-  render();
+  change(() => {
+    if (fn(found.ev) === false) return false;
+    fix(found.ev);
+  }, key && key + ":" + found.ev.id);
 }
 
 // Number fields only apply values that make sense (windup <= start < end <= winddown).
@@ -259,11 +324,11 @@ function edit(fn) {
 function editNum(el, valid, apply) {
   const v = el.value.trim() === "" ? NaN : Math.floor(Number(el.value));
   if (!Number.isFinite(v)) return;
-  edit((ev) => (valid(v, ev) ? apply(v, ev) : false));
+  edit((ev) => (valid(v, ev) ? apply(v, ev) : false), el.id);
 }
 
-F.title.addEventListener("input", () => edit((ev) => { ev.title = F.title.value; }));
-F.desc.addEventListener("input", () => edit((ev) => { ev.description = F.desc.value; }));
+F.title.addEventListener("input", () => edit((ev) => { ev.title = F.title.value; }, "title"));
+F.desc.addEventListener("input", () => edit((ev) => { ev.description = F.desc.value; }, "desc"));
 F.start.addEventListener("input", () => editNum(F.start, (v, ev) => v >= 0 && v < ev.end, (v, ev) => { ev.start = v; }));
 F.end.addEventListener("input", () => editNum(F.end, (v, ev) => v > ev.start, (v, ev) => { ev.end = v; }));
 F.wu.addEventListener("input", () => editNum(F.wu, (v, ev) => v >= 0 && v <= ev.start, (v, ev) => { ev.windup = v; }));
@@ -280,25 +345,17 @@ for (const el of [F.start, F.end, F.len, F.wu, F.wulen, F.wd, F.wdlen]) {
   el.addEventListener("focus", () => setTimeout(() => el.select(), 0)); // typing replaces the old value
   el.addEventListener("change", () => syncPanel(true));                 // snap back if the value was rejected
 }
-F.color.addEventListener("input", () => edit((ev) => { ev.color = F.color.value; }));
+F.color.addEventListener("input", () => edit((ev) => { ev.color = F.color.value; }, "color"));
 
 $("close").addEventListener("click", () => { selected = null; render(); });
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && selected) { selected = null; render(); return; }
-  const typing = e.target.closest && e.target.closest("input, textarea, select");
-  if ((e.key === "Delete" || e.key === "Backspace") && selected && !typing) {
-    e.preventDefault();
-    deleteEvent(selected);
-  }
-});
 
 function deleteEvent(id) {
   const found = findEvent(id);
   if (!found) return;
-  found.row.events = found.row.events.filter((v) => v !== found.ev);
-  if (selected === id) selected = null;
-  save();
-  render();
+  change(() => {
+    found.row.events = found.row.events.filter((v) => v !== found.ev);
+    if (selected === id) selected = null;
+  });
 }
 
 $("delete").addEventListener("click", () => { if (selected) deleteEvent(selected); });
@@ -307,15 +364,55 @@ grid.addEventListener("click", (e) => {
   const x = e.target.closest(".x");
   if (x) deleteEvent(x.closest(".block").dataset.ev);
   if (e.target.closest(".plus")) {
-    state.length = totalSecs() + EXTEND;
-    save();
-    render();
-    scroller.scrollLeft += EXTEND * PX; // keep the + under the pointer for repeat taps
+    change(() => { state.length = totalSecs() + EXTEND; });
+    scroller.scrollLeft += EXTEND * px; // keep the + under the pointer for repeat taps
+  }
+});
+
+// ---------- Copy and paste ----------
+function copySelected() {
+  const found = selected && findEvent(selected);
+  if (found) clip = { rowId: found.row.id, ev: { ...found.ev } };
+}
+
+// Pastes an exact copy: same row, same times (it stacks into a new lane if it overlaps).
+function pasteEvent() {
+  if (!clip) return;
+  change(() => {
+    const row = state.rows.find((r) => r.id === clip.rowId)
+      || (selected && findEvent(selected)?.row)
+      || state.rows[0];
+    if (!row) return false;
+    const copy = { ...clip.ev, id: uid() };
+    row.events.push(copy);
+    selected = copy.id;
+  });
+}
+
+// ---------- Keyboard shortcuts ----------
+document.addEventListener("keydown", (e) => {
+  const typing = e.target.closest && e.target.closest("input, textarea, select");
+
+  if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    const key = e.key.toLowerCase();
+    if (key === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+    else if (key === "y") { e.preventDefault(); redo(); }
+    else if (key === "s") { e.preventDefault(); downloadJson(); }
+    else if (key === "o") { e.preventDefault(); $("file").click(); }
+    else if (key === "c" && !typing && selected && !String(window.getSelection())) { e.preventDefault(); copySelected(); }
+    else if (key === "v" && !typing && clip) { e.preventDefault(); pasteEvent(); }
+    return;
+  }
+
+  if (e.key === "Escape" && selected) { selected = null; render(); return; }
+  if ((e.key === "Delete" || e.key === "Backspace") && selected && !typing) {
+    e.preventDefault();
+    deleteEvent(selected);
   }
 });
 
 // ---------- Dragging (mouse and touch) ----------
-const posAt = (e) => (e.clientX - scroller.getBoundingClientRect().left + scroller.scrollLeft - LABEL_W) / PX;
+const posAt = (e) => (e.clientX - scroller.getBoundingClientRect().left + scroller.scrollLeft - LABEL_W) / px;
 const secAt = (e) => Math.max(0, Math.floor(posAt(e)));
 
 function reorderRows(e) {
@@ -336,9 +433,21 @@ function reorderRows(e) {
 
 scroller.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || e.target.closest(".x")) return;
+
+  if (e.target.closest(".now-flag")) {
+    nowDrag = true;
+    document.activeElement?.blur?.();
+    scroller.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    return;
+  }
+
+  const before = snapshot();
+  editGroup = null;
+
   const grip = e.target.closest(".grip");
   if (grip) {
-    rowDrag = { row: state.rows.find((r) => r.id === grip.dataset.row) };
+    rowDrag = { row: state.rows.find((r) => r.id === grip.dataset.row), before };
     document.activeElement?.blur?.();
     scroller.setPointerCapture(e.pointerId);
     e.preventDefault();
@@ -365,13 +474,18 @@ scroller.addEventListener("pointerdown", (e) => {
 
   selected = ev.id;
   document.activeElement?.blur?.(); // so Delete reaches the event, not a text box
-  drag = { mode, row, ev, anchor: sec, offset: sec - ev.start, moved: false, x: e.clientX, y: e.clientY };
+  drag = { mode, row, ev, before, anchor: sec, offset: sec - ev.start, moved: false, x: e.clientX, y: e.clientY };
   scroller.setPointerCapture(e.pointerId);
   e.preventDefault();
   render();
 });
 
 scroller.addEventListener("pointermove", (e) => {
+  if (nowDrag) {
+    state.now = Math.min(totalSecs(), Math.max(0, Math.round(posAt(e))));
+    render();
+    return;
+  }
   if (rowDrag) { reorderRows(e); return; }
   if (!drag) return;
   const { ev, mode } = drag;
@@ -410,31 +524,50 @@ scroller.addEventListener("pointermove", (e) => {
 });
 
 function endDrag(e) {
-  if (rowDrag) { rowDrag = null; save(); render(); return; }
-  if (!drag) return;
-  const { mode, ev, row } = drag;
-  drag = null;
-  if (e.type === "pointercancel" && mode === "create") {
-    row.events = row.events.filter((x) => x !== ev); // browser took over to scroll
-    if (selected === ev.id) selected = null;
+  if (nowDrag) { nowDrag = false; save(); render(); return; }
+  const d = rowDrag || drag;
+  if (!d) return;
+  if (drag && e.type === "pointercancel" && drag.mode === "create") {
+    drag.row.events = drag.row.events.filter((x) => x !== drag.ev); // browser took over to scroll
+    if (selected === drag.ev.id) selected = null;
   }
+  rowDrag = null;
+  drag = null;
+  if (snapshot() !== d.before) pushUndo(d.before); // one undo step per drag
   save();
   render();
 }
 scroller.addEventListener("pointerup", endDrag);
 scroller.addEventListener("pointercancel", endDrag);
 
+// ---------- Zoom ----------
+function setZoom(z) {
+  const half = (scroller.clientWidth - LABEL_W) / 2;
+  const centreSec = (scroller.scrollLeft + half) / px; // keep the middle of the view where it is
+  zoom = z;
+  px = BASE_PX * zoom;
+  try { localStorage.setItem(ZOOM_KEY, String(zoom)); } catch { /* storage unavailable */ }
+  render();
+  scroller.scrollLeft = centreSec * px - half;
+}
+const stepZoom = (dir) => {
+  const next = ZOOMS[ZOOMS.indexOf(zoom) + dir];
+  if (next) setZoom(next);
+};
+$("zoomOut").addEventListener("click", () => stepZoom(-1));
+$("zoomIn").addEventListener("click", () => stepZoom(1));
+$("zoomLevel").addEventListener("click", () => setZoom(1));
+
 // ---------- Buttons ----------
 $("addRow").addEventListener("click", () => {
-  state.rows.push(newRow(`Entity ${state.rows.length + 1}`));
-  save();
-  render();
+  change(() => { state.rows.push(newRow(`Entity ${state.rows.length + 1}`)); });
 });
 
-$("download").addEventListener("click", () => {
+function downloadJson() {
   const data = {
-    version: 5,
+    version: 6,
     length: totalSecs(),
+    now: Math.min(state.now, totalSecs()),
     rows: state.rows.map(({ name, events }) => ({
       name,
       events: events.map(({ windup, start, end, winddown, title, description, color }) => ({ windup, start, end, winddown, title, description, color })),
@@ -444,14 +577,19 @@ $("download").addEventListener("click", () => {
   const a = h("a", { href: URL.createObjectURL(blob), download: `combat-${new Date().toISOString().slice(0, 10)}.json` });
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-});
+}
+$("download").addEventListener("click", downloadJson);
 
 $("reset").addEventListener("click", () => {
-  if (!confirm("Reset everything? This removes all events and all rows except the first, and sets the timeline back to 60 seconds. Download first if you want to keep this combat.")) return;
-  const first = state.rows[0] || newRow("Player 1");
-  first.events = [];
-  state = { rows: [first], length: MIN_SECS };
-  selected = null;
+  if (!confirm("Reset everything? This removes all events and all rows except the first, and sets the timeline back to 60 seconds. You can undo with Ctrl+Z, or download first to keep a copy.")) return;
+  change(() => {
+    const first = state.rows[0] || newRow("Player 1");
+    first.events = [];
+    state.rows = [first];
+    state.length = MIN_SECS;
+    selected = null;
+  });
+  state.now = 0;
   save();
   render();
   scroller.scrollLeft = 0;
@@ -466,8 +604,12 @@ $("file").addEventListener("change", async () => {
   try {
     const next = clean(JSON.parse(await file.text()));
     if (maxEnd() > 0 && !confirm("Replace the current combat with this file?")) return;
-    state = next;
-    selected = null;
+    change(() => {
+      state.rows = next.rows;
+      state.length = next.length;
+      selected = null;
+    });
+    state.now = next.now;
     save();
     render();
   } catch (err) {

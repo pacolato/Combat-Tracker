@@ -17,6 +17,11 @@
     <h1>Combat Tracker</h1>
     <span id="upto">Up to: 0s</span>
     <div class="actions">
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button id="zoomOut" type="button" title="Zoom out">−</button>
+        <button id="zoomLevel" type="button" title="Reset zoom to 100%">100%</button>
+        <button id="zoomIn" type="button" title="Zoom in">+</button>
+      </div>
       <button id="reset" type="button" class="danger">Reset</button>
       <button id="upload" type="button">Upload</button>
       <button id="download" type="button" class="primary">Download</button>
@@ -31,8 +36,9 @@
   <footer>
     <button id="addRow" type="button">Add row</button>
     <p>Drag on a row to add an action, including under an existing one. Drag a block to move it, its right edge to
-      resize it, or the dots on its wind-up and wind-down lines to change them. Drag ≡ to reorder rows. Press Delete to
-      remove the selected event.</p>
+      resize it, or the dots on its wind-up and wind-down lines to change them. Drag ≡ to reorder rows. Drag the red
+      flag on the ruler to move the now marker. Shortcuts: Delete removes the selected event, Ctrl+Z undoes, Ctrl+C and
+      Ctrl+V copy and paste an event, Ctrl+S downloads, Ctrl+O uploads.</p>
   </footer>
 
   <aside id="panel" hidden>
